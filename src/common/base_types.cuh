@@ -15,6 +15,7 @@
 
 #include <string>
 #include <bit>
+#include <type_traits>
 
 namespace kittens {
 
@@ -56,6 +57,20 @@ concept T2 = std::is_same_v<T, float2> || std::is_same_v<T, bf16_2>; // could ad
  */
 namespace base_types {
 
+template <typename To, typename From>
+constexpr typename std::enable_if<
+    sizeof(To) == sizeof(From) &&
+    std::is_trivially_copyable<From>::value &&
+    std::is_trivially_copyable<To>::value,
+    To>::type
+bit_cast(const From& src) noexcept {
+    union {
+        From src;
+        To dst;
+    } u = {src};
+    return u.dst;
+}
+
 /**
  * @brief Provides compile-time constants for different types.
  *
@@ -90,10 +105,10 @@ template<> struct constants<float2> {
     static __device__ inline constexpr float2 neg_infty() { return float2{constants<float>::neg_infty(), constants<float>::neg_infty()}; }
 };
 template<> struct constants<bf16> {
-    static __device__ inline constexpr bf16 zero()      { return std::bit_cast<__nv_bfloat16>(uint16_t(0x0000)); } // unfortunately __float2bf16_rn is not constexpr
-    static __device__ inline constexpr bf16 one()       { return std::bit_cast<__nv_bfloat16>(uint16_t(0x3F80)); }
-    static __device__ inline constexpr bf16 pos_infty() { return std::bit_cast<__nv_bfloat16>(uint16_t(0x7F80)); }
-    static __device__ inline constexpr bf16 neg_infty() { return std::bit_cast<__nv_bfloat16>(uint16_t(0xFF80)); }
+    static __device__ inline constexpr bf16 zero()      { return bit_cast<__nv_bfloat16>(uint16_t(0x0000)); } // unfortunately __float2bf16_rn is not constexpr
+    static __device__ inline constexpr bf16 one()       { return bit_cast<__nv_bfloat16>(uint16_t(0x3F80)); }
+    static __device__ inline constexpr bf16 pos_infty() { return bit_cast<__nv_bfloat16>(uint16_t(0x7F80)); }
+    static __device__ inline constexpr bf16 neg_infty() { return bit_cast<__nv_bfloat16>(uint16_t(0xFF80)); }
 };
 template<> struct constants<bf16_2> {
     static __device__ inline constexpr bf16_2 zero()      { return bf16_2{constants<bf16>::zero(),      constants<bf16>::zero()};      }
@@ -102,10 +117,10 @@ template<> struct constants<bf16_2> {
     static __device__ inline constexpr bf16_2 neg_infty() { return bf16_2{constants<bf16>::neg_infty(), constants<bf16>::neg_infty()}; }
 };
 template<> struct constants<half> {
-    static __device__ inline constexpr half zero()      { return std::bit_cast<__half>(uint16_t(0x0000)); }
-    static __device__ inline constexpr half one()       { return std::bit_cast<__half>(uint16_t(0x3C00)); }
-    static __device__ inline constexpr half pos_infty() { return std::bit_cast<__half>(uint16_t(0x7C00)); }
-    static __device__ inline constexpr half neg_infty() { return std::bit_cast<__half>(uint16_t(0xFC00)); }
+    static __device__ inline constexpr half zero()      { return bit_cast<__half>(uint16_t(0x0000)); }
+    static __device__ inline constexpr half one()       { return bit_cast<__half>(uint16_t(0x3C00)); }
+    static __device__ inline constexpr half pos_infty() { return bit_cast<__half>(uint16_t(0x7C00)); }
+    static __device__ inline constexpr half neg_infty() { return bit_cast<__half>(uint16_t(0xFC00)); }
 };
 template<> struct constants<half_2> {
     static __device__ inline constexpr half_2 zero()      { return half_2{constants<half>::zero(),      constants<half>::zero()};      }
@@ -211,6 +226,7 @@ template<> struct convertor<bf16_2, float2> {
         return 	__float22bfloat162_rn(u);
     }
 };
+
 
 }
 }
